@@ -1,5 +1,6 @@
 import numpy as np 
 import matplotlib.pyplot as plt 
+import matplotlib.patches as patches
 
 from astroquery.gaia import Gaia
 from astroquery.vizier import Vizier
@@ -141,19 +142,27 @@ def create_plot(stars, camera_width_pix, camera_height_pix, plot_lim_mag=12, plo
     yticks = np.linspace(0, camera_height_pix, 5)
     ax.set_yticks(yticks.astype(int))
 
-    # Add red lines to show the camera FOV 
-    plt.axvline(0, color="red") 
-    plt.axvline(camera_width_pix, color="red")
-    plt.axhline(0, color="red") 
-    plt.axhline(camera_height_pix, color="red") 
+    # Add red rectangle to show the camera FOV 
+    rect = patches.Rectangle(
+        (0, 0),  # bottom-left corner
+        camera_width_pix,
+        camera_height_pix,
+        linewidth=2,
+        edgecolor="red",
+        facecolor="none"
+    )
+    ax.add_patch(rect)
+
+    # Add red X crosshair at center of image 
+    plt.scatter(
+        camera_width_pix/2,
+        camera_height_pix/2,
+        marker="x",
+        color="red",
+        s=50, 
+        alpha=0.5, 
+    )
 
     return fig, ax 
 
 
-
-
-
-# # theta = np.deg2rad(theta_slider.value) 
-# plot_lim_mag = mag_lim_slider.value
-# Wrap current axes in reactive matplotlib widget
-# ax = mo.ui.matplotlib(plt.gca())
