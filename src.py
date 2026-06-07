@@ -20,7 +20,50 @@ def retrieve_stars(
         catalog="I/239/hip_main", 
         mag_limit=17, 
     ): 
+    """
+    Query a star catalog for objects within a circular field of view and
+    return their sky coordinates and magnitudes.
 
+    This function uses VizieR to search a specified astronomical catalog
+    (e.g., Gaia DR3 or Hipparcos) for all stars within a given angular
+    radius of a central sky position. A magnitude cut is applied at the
+    catalog-query level to improve performance by limiting faint sources.
+
+    Parameters
+    ----------
+    center_ra : float
+        Right ascension of the field center in degrees.
+
+    center_dec : float
+        Declination of the field center in degrees.
+
+    radius_deg : float
+        Search radius around the field center in degrees.
+
+    catalog : str, optional
+        VizieR catalog identifier to query. Supported examples:
+        - "I/355/gaiadr3" (Gaia DR3)
+        - "I/239/hip_main" (Hipparcos main catalog)
+
+    mag_limit : float, optional
+        Upper magnitude limit used in the query (fainter stars are excluded
+        at the server level). The relevant magnitude band depends on the
+        catalog (e.g., Gmag for Gaia, Vmag for Hipparcos).
+
+    Returns
+    -------
+    dict
+        Dictionary containing:
+        - "ra" : numpy.ndarray
+            Right ascension values in degrees.
+        - "dec" : numpy.ndarray
+            Declination values in degrees.
+        - "mag" : numpy.ndarray
+            Apparent magnitudes in the catalog's native band.
+
+        If no stars are found, returns empty arrays.
+    """
+    
     print(f"Searching '{catalog}'...")
 
     # Choose keywords to access the variables depending on which catalog is chosen  
@@ -77,7 +120,68 @@ def retrieve_stars(
 
 
 def convert_skycoords_to_pixelcoords(stars, center_ra, center_dec, theta_deg, camera_width_pix, camera_height_pix, plate_scale, invert=False): 
-    
+    """
+    Convert celestial coordinates (RA, Dec) into pixel coordinates for a
+    simulated telescope camera field.
+
+    This function performs a small-angle tangent-plane projection around a
+    specified field center, applies an optional rotation (camera orientation),
+    and converts angular offsets into pixel units using the detector plate scale.
+
+    The resulting pixel coordinates are added in-place to the input dictionary
+    under the keys "x" and "y".
+
+    Parameters
+    ----------
+    stars : dict
+        Dictionary containing at minimum:
+        - "ra" : array-like
+        - "dec" : array-like
+
+        These are assumed to be in degrees.
+
+    center_ra : float
+        Right ascension of the field center in degrees.
+
+    center_dec : float
+        Declination of the field center in degrees.
+
+    theta_deg : float
+        Rotation angle of the camera in degrees. This defines how the field is
+        rotated in the image plane.
+
+    camera_width_pix : float
+        Width of the detector/image in pixels.
+
+    camera_height_pix : float
+        Height of the detector/image in pixels.
+
+    plate_scale : float
+        Plate scale of the instrument in arcseconds per pixel.
+
+    invert : bool, optional
+        If True, flips the x-axis direction (used to match different telescope
+        or image parity conventions).
+
+    Returns
+    -------
+    dict
+        The same input dictionary with two additional keys:
+        - "x" : numpy.ndarray
+            Pixel x-coordinates of each star.
+        - "y" : numpy.ndarray
+            Pixel y-coordinates of each star.
+
+    Notes
+    -----
+    - Uses the small-angle approximation:
+      RA offsets are scaled by cos(dec_center) to account for convergence of meridians.
+    - Rotation is applied in the image plane after projection.
+    - Plate scale is assumed to be in arcseconds/pixel and is converted internally.
+    - Output coordinates are centered on the middle of the detector.
+    - This approximation is valid for small fields (typically < a few degrees).
+    """
+
     theta = np.deg2rad(theta_deg) 
 
     dx = (-1)**(invert+1) * (stars["ra"] - center_ra) * np.cos(np.deg2rad(center_dec))
@@ -107,8 +211,68 @@ def convert_skycoords_to_pixelcoords(stars, center_ra, center_dec, theta_deg, ca
 
 
 
-def create_plot(stars, camera_width_pix, camera_height_pix, plot_lim_mag=12, plot_margin=300): 
+def create_plot(
+        stars,
+        camera_width_pix,
+        camera_height_pix,
+        plot_lim_mag=12,
+        plot_margin=300
+    ):
+    """
+    Generate a simulated star field plot in pixel coordinates for a telescope
+    detector, including magnitude-based filtering, brightness scaling, and
+    camera field-of-view overlays.
 
+    This function visualizes stars projected onto a detector plane. Stars are
+    filtered by an apparent magnitude limit, scaled in size according to
+    relative brightness, and plotted in pixel coordinates. The camera field of
+    view is shown as a red rectangle, with an optional margin around the edges.
+
+    Parameters
+    ----------
+    stars : dict
+        Dictionary containing at minimum:
+        - "x" : array-like
+            Pixel x-coordinates of stars.
+        - "y" : array-like
+            Pixel y-coordinates of stars.
+        - "mag" : array-like
+            Apparent magnitudes of stars.
+
+    camera_width_pix : int or float
+        Width of the camera sensor in pixels.
+
+    camera_height_pix : int or float
+        Height of the camera sensor in pixels.
+
+    plot_lim_mag : float, optional
+        Limiting magnitude for display. Only stars brighter than this value
+        (i.e., mag < plot_lim_mag) are plotted.
+
+    plot_margin : float, optional
+        Extra padding (in pixels) added around the camera field when setting
+        plot limits.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The created Matplotlib figure object.
+
+    ax : matplotlib.axes.Axes
+        The axes object containing the plot.
+
+    Notes
+    -----
+    - Star marker size scales with a square-root function of relative
+      brightness derived from magnitude.
+    - The camera field of view is drawn as a red rectangle from (0,0) to
+      (camera_width_pix, camera_height_pix).
+    - A red cross marks the geometric center of the detector.
+    - Intended for small-field astronomical simulations where distortion is
+      negligible.
+    - Assumes pixel coordinates have already been computed externally.
+    """
+    
     # Apply  mask based on slider value
     mask = stars["mag"] < plot_lim_mag
     stars_new = {key: stars[key][mask] for key in stars}

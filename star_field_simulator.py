@@ -42,7 +42,6 @@ def _(
 
     center_ra = center_ra_textbox.value 
     center_dec = center_dec_textbox.value 
-
     return (
         camera_height_pix,
         camera_width_pix,
@@ -115,7 +114,6 @@ def _(
         plate_scale, 
         invert=invert_checkbox.value, 
     ) 
-
     return (stars,)
 
 
@@ -128,7 +126,6 @@ def _(camera_height_pix, camera_width_pix, mag_lim_slider, src, stars):
         camera_height_pix, 
         plot_lim_mag=mag_lim_slider.value, 
     )
-
     return (ax,)
 
 
