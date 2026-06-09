@@ -2,12 +2,54 @@ import numpy as np
 import matplotlib.pyplot as plt 
 import matplotlib.patches as patches
 
-from astroquery.gaia import Gaia
+# from astroquery.gaia import Gaia
 from astroquery.vizier import Vizier
 
 from astropy.coordinates import SkyCoord
 import astropy.units as u 
+import astropy.io 
 
+
+
+
+
+# Load a FITS file (include the data as a 2d array, the header, and the full path to the file that was loaded)
+def load_fits(fullpath):
+    print(f"Loading {fullpath}") 
+    data= astropy.io.fits.getdata(fullpath, ext=0)  
+    header = astropy.io.fits.open(fullpath)[0].header 
+    file = {"data": data, "header": header, "fullpath": fullpath}
+    return file
+
+
+
+
+
+def plot_fits( 
+        ax, 
+        file, 
+        vrange_std=None,
+        vrange_absval=None,
+        cmap='gray', 
+    ):
+
+    image = file["data"] 
+
+    # Choose vmin and vmax 
+    if vrange_std is None and vrange_absval is None:
+        vrange_std = (-1, 4)
+    if vrange_std is not None and vrange_absval is not None:
+        raise ValueError("Provide either vrange_std or vrange_absval, not both")
+    mean = np.mean(image)
+    std = np.std(image)
+    if vrange_std is not None:
+        vmin = mean + min(vrange_std) * std
+        vmax = mean + max(vrange_std) * std
+    else:
+        vmin, vmax = min(vrange_absval), max(vrange_absval)
+
+    # Display image 
+    ax.imshow(image, cmap=cmap, vmin=vmin, vmax=vmax)
 
 
 
@@ -18,7 +60,7 @@ def retrieve_stars(
         center_dec, 
         radius_deg, 
         catalog="I/239/hip_main", 
-        mag_limit=17, 
+        mag_limit=18, 
     ): 
     """
     Query a star catalog for objects within a circular field of view and
@@ -184,7 +226,8 @@ def convert_skycoords_to_pixelcoords(stars, center_ra, center_dec, theta_deg, ca
 
     theta = np.deg2rad(theta_deg) 
 
-    dx = (-1)**(invert+1) * (stars["ra"] - center_ra) * np.cos(np.deg2rad(center_dec))
+    dra = (stars["ra"] - center_ra + 180) % 360 - 180
+    dx = (-1)**(invert+1) * dra * np.cos(np.deg2rad(center_dec))
     dy = stars["dec"] - center_dec
 
     x_rot =  dx*np.cos(theta) + dy*np.sin(theta)
@@ -211,7 +254,8 @@ def convert_skycoords_to_pixelcoords(stars, center_ra, center_dec, theta_deg, ca
 
 
 
-def create_plot(
+def plot_stars(
+        ax, 
         stars,
         camera_width_pix,
         camera_height_pix,
@@ -287,21 +331,19 @@ def create_plot(
     size = max_dot_size * brightness**0.5
 
     # Create plot 
-    fig = plt.figure(figsize=(9, 6))
-    ax = plt.gca() 
-    plt.scatter(stars_new["x"], stars_new["y"], s=size, color="black")
+    ax.scatter(stars_new["x"], stars_new["y"], s=size, color="red", zorder=5)
 
     # Label axes and title 
-    plt.xlabel("X (pixels)")
-    plt.ylabel("Y (pixels)")
-    plt.title(f"Stars with mag < {plot_lim_mag:.2f} (N={mask.sum()})") 
+    ax.set_xlabel("X (pixels)")
+    ax.set_ylabel("Y (pixels)")
+    ax.set_title(f"Stars with mag < {plot_lim_mag:.2f} (N={mask.sum()})") 
 
     # Limits: add margin beyond FOV of camera 
-    plt.xlim((0-plot_margin, camera_width_pix+plot_margin))
-    plt.ylim((0-plot_margin, camera_height_pix+plot_margin)) 
+    ax.set_xlim(0-plot_margin, camera_width_pix+plot_margin)
+    ax.set_ylim(0-plot_margin, camera_height_pix+plot_margin)
 
     # Tick labels: evenly spaced
-    xticks = np.linspace(0, camera_width_pix, 5)
+    xticks = np.linspace(0, camera_width_pix, 7)
     ax.set_xticks(xticks.astype(int))
     yticks = np.linspace(0, camera_height_pix, 5)
     ax.set_yticks(yticks.astype(int))
@@ -311,22 +353,22 @@ def create_plot(
         (0, 0),  # bottom-left corner
         camera_width_pix,
         camera_height_pix,
-        linewidth=2,
+        linewidth=1, 
+        zorder=4, 
         edgecolor="red",
         facecolor="none"
     )
     ax.add_patch(rect)
 
-    # Add red X crosshair at center of image 
-    plt.scatter(
-        camera_width_pix/2,
-        camera_height_pix/2,
-        marker="x",
-        color="red",
-        s=50, 
-        alpha=0.5, 
-    )
+    # # Add red X crosshair at center of image 
+    # plt.scatter(
+    #     camera_width_pix/2,
+    #     camera_height_pix/2,
+    #     marker="x",
+    #     color="red",
+    #     s=50, 
+    #     alpha=0.5, 
+    # )
 
-    return fig, ax 
 
 
