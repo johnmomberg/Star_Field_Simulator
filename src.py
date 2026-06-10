@@ -227,7 +227,7 @@ def convert_skycoords_to_pixelcoords(stars, center_ra, center_dec, theta_deg, ca
     theta = np.deg2rad(theta_deg) 
 
     dra = (stars["ra"] - center_ra + 180) % 360 - 180
-    dx = (-1)**(invert+1) * dra * np.cos(np.deg2rad(center_dec))
+    dx = (-1)**(invert) * dra * np.cos(np.deg2rad(center_dec))
     dy = stars["dec"] - center_dec
 
     x_rot =  dx*np.cos(theta) + dy*np.sin(theta)
@@ -331,7 +331,7 @@ def plot_stars(
     size = max_dot_size * brightness**0.5
 
     # Create plot 
-    ax.scatter(stars_new["x"], stars_new["y"], s=size, color="red", zorder=5)
+    ax.scatter(stars_new["x"], stars_new["y"], s=size, color="tab:orange", zorder=5)
 
     # Label axes and title 
     ax.set_xlabel("X (pixels)")
@@ -355,20 +355,10 @@ def plot_stars(
         camera_height_pix,
         linewidth=1, 
         zorder=4, 
-        edgecolor="red",
+        edgecolor="tab:blue",
         facecolor="none"
     )
     ax.add_patch(rect)
-
-    # # Add red X crosshair at center of image 
-    # plt.scatter(
-    #     camera_width_pix/2,
-    #     camera_height_pix/2,
-    #     marker="x",
-    #     color="red",
-    #     s=50, 
-    #     alpha=0.5, 
-    # )
 
 
 

@@ -33,11 +33,22 @@ def _():
 
 
 @app.cell
-def _(src):
+def _(mo):
     # 1: Load fits file displayed in background of plot  
-    folder = "D:/Observations_(Fits_Files)/SBIG_Speed_Test/NoROI_raw/"
-    file = src.load_fits(folder+"NoROI_1x1_30sec-0001.fit") 
+    file_selector_textbox = mo.ui.text(
+        value="D:/Observations_(Fits_Files)/SBIG_Speed_Test/NoROI_raw/NoROI_1x1_30sec-0001.fit", 
+        label="Full path to FITS file", 
+        full_width=True, 
+    )
 
+    file_selector_textbox
+
+    return (file_selector_textbox,)
+
+
+@app.cell
+def _(file_selector_textbox, src):
+    file = src.load_fits(file_selector_textbox.value)
     return (file,)
 
 
@@ -61,12 +72,12 @@ def _(mo):
     )
 
     target_ra_textbox = mo.ui.text(
-        value="00:00:00",
+        value="15:13:16.82",
         label="Target RA (HH:MM:SS)",
     )
 
     target_dec_textbox = mo.ui.text(
-        value="+00:00:00",
+        value="+25:41:10.7",
         label="Target Dec (±DD:MM:SS)",
     )
 
@@ -147,6 +158,7 @@ def _(
         center_dec=target_dec, 
         radius_deg=radius_deg, 
         catalog="I/355/gaiadr3", 
+        mag_limit=18 
     )
 
     # Combine all stars into single dict 
@@ -155,13 +167,12 @@ def _(
         "dec": np.concatenate([stars_gaia["dec"], stars_hipparcos["dec"]]),
         "mag": np.concatenate([stars_gaia["mag"], stars_hipparcos["mag"]]),
     }
-
     return fov_deg, stars_no_xy
 
 
 @app.cell
 def _(fov_deg, mo, target_dec, target_ra):
-    # 5: Create and display input windows for loading stars 
+    # Coarse sliders 
 
 
     # Magnitude limit slider 
@@ -170,7 +181,7 @@ def _(fov_deg, mo, target_dec, target_ra):
         stop=18,
         value=12, 
         step=1, 
-        label="Mag",
+        label="Limiting magnitude",
         full_width=True, 
         show_value=True, 
     ) 
@@ -186,9 +197,9 @@ def _(fov_deg, mo, target_dec, target_ra):
     ) 
 
     # Theta slider 
-    theta_slider = mo.ui.slider(
-        start=0, 
-        stop=540, 
+    theta_slider_coarse = mo.ui.slider(
+        start=-180, 
+        stop=360, 
         value=0, 
         step=5, 
         label="Theta", 
@@ -208,36 +219,81 @@ def _(fov_deg, mo, target_dec, target_ra):
     )
 
 
-    plot_center_ra_slider = mo.ui.slider(
+    plot_center_ra_slider_coarse = mo.ui.slider(
         start=round(target_ra - fov_deg, 4),
         stop=round(target_ra + fov_deg, 4),
         value=round(target_ra, 4),
-        step=round(fov_deg / 500, 4),
+        step=round(fov_deg / 10, 4),
         label="Plot center RA offset (deg)",
         full_width=True,
         show_value=True,
     )
 
-    plot_center_dec_slider = mo.ui.slider(
+    plot_center_dec_slider_coarse = mo.ui.slider(
         start=round(target_dec - fov_deg, 4),
         stop=round(target_dec + fov_deg, 4),
         value=round(target_dec, 4),
-        step=round(fov_deg / 500, 4),
+        step=round(fov_deg / 10, 4),
         label="Plot center dec offset (deg)",
         full_width=True,
         show_value=True,
     )
 
-    mo.vstack([mag_lim_slider, plot_margin_slider, mo.hstack([theta_slider, invert_checkbox, show_image]), plot_center_ra_slider, plot_center_dec_slider]) 
 
     return (
         invert_checkbox,
         mag_lim_slider,
-        plot_center_dec_slider,
-        plot_center_ra_slider,
+        plot_center_dec_slider_coarse,
+        plot_center_ra_slider_coarse,
         plot_margin_slider,
         show_image,
-        theta_slider,
+        theta_slider_coarse,
+    )
+
+
+@app.cell
+def _(
+    mo,
+    plot_center_dec_slider_coarse,
+    plot_center_ra_slider_coarse,
+    theta_slider_coarse,
+):
+    # Fine sliders 
+
+    theta_slider_fine = mo.ui.slider(
+        start=theta_slider_coarse.value-theta_slider_coarse.step*2, 
+        stop=theta_slider_coarse.value+theta_slider_coarse.step*2, 
+        value=theta_slider_coarse.value, 
+        step=0.1, 
+        label="Theta (fine)", 
+        full_width=True, 
+        show_value=True, 
+    )
+
+    plot_center_ra_slider_fine = mo.ui.slider(
+        start=round(plot_center_ra_slider_coarse.value-plot_center_ra_slider_coarse.step*2, 4),
+        stop=round(plot_center_ra_slider_coarse.value+plot_center_ra_slider_coarse.step*2, 4),
+        value=round(plot_center_ra_slider_coarse.value, 4),
+        step=round(plot_center_ra_slider_coarse.step/100, 5),
+        label="Plot center RA offset (deg) (fine)",
+        full_width=True,
+        show_value=True,
+    )
+
+    plot_center_dec_slider_fine = mo.ui.slider(
+        start=round(plot_center_dec_slider_coarse.value-plot_center_dec_slider_coarse.step*2, 4),
+        stop=round(plot_center_dec_slider_coarse.value+plot_center_dec_slider_coarse.step*2, 4),
+        value=round(plot_center_dec_slider_coarse.value, 4),
+        step=round(plot_center_dec_slider_coarse.step/100, 5),
+        label="Plot center dec offset (deg) (fine)",
+        full_width=True,
+        show_value=True,
+    )
+
+    return (
+        plot_center_dec_slider_fine,
+        plot_center_ra_slider_fine,
+        theta_slider_fine,
     )
 
 
@@ -245,20 +301,43 @@ def _(fov_deg, mo, target_dec, target_ra):
 def _(
     invert_checkbox,
     mag_lim_slider,
-    plot_center_dec_slider,
-    plot_center_ra_slider,
+    mo,
+    plot_center_dec_slider_coarse,
+    plot_center_dec_slider_fine,
+    plot_center_ra_slider_coarse,
+    plot_center_ra_slider_fine,
     plot_margin_slider,
-    theta_slider,
+    show_image,
+    theta_slider_coarse,
+    theta_slider_fine,
+):
+    mo.vstack([
+        mag_lim_slider, 
+        mo.hstack([plot_margin_slider, show_image]), 
+        mo.hstack([theta_slider_coarse, theta_slider_fine, invert_checkbox]), 
+        mo.hstack([plot_center_ra_slider_coarse, plot_center_ra_slider_fine]), 
+        mo.hstack([plot_center_dec_slider_coarse, plot_center_dec_slider_fine])
+    ]) 
+    return
+
+
+@app.cell
+def _(
+    invert_checkbox,
+    mag_lim_slider,
+    plot_center_dec_slider_fine,
+    plot_center_ra_slider_fine,
+    plot_margin_slider,
+    theta_slider_fine,
 ):
     # 6: Access values from input windows 
     plot_lim_mag = mag_lim_slider.value 
     plot_margin = plot_margin_slider.value 
-    theta_deg = theta_slider.value 
+    theta_deg = theta_slider_fine.value 
     invert = invert_checkbox.value 
 
-    plot_center_ra = plot_center_ra_slider.value 
-    plot_center_dec = plot_center_dec_slider.value 
-
+    plot_center_ra = plot_center_ra_slider_fine.value 
+    plot_center_dec = plot_center_dec_slider_fine.value 
     return (
         invert,
         plot_center_dec,
@@ -346,9 +425,19 @@ def _(
         target["x"],
         target["y"],
         facecolors='none',
-        edgecolors='red', 
+        edgecolors="tab:green", 
         s=50, 
+        label=f"Target: {int(target['x'])}, {int(target['y'])}"
     )
+    plt.legend()
+    return
+
+
+@app.cell
+def _(mo, target):
+    mo.md(f"""
+    Target position: {target['x']:.1f}, {target['y']:.1f}
+    """)
     return
 
 
